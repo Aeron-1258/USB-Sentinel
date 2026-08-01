@@ -1,0 +1,43 @@
+@import './styles/reset.css';
+@import './styles/theme.css';
+@import './styles/components.css';
+@import './styles/layout.css';
+@import './styles/animations.css';
+
+/* Global App Styles specific to layout */
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-bg-base);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* Important for flex child truncation */
+}
+
+.workspace {
+  flex: 1;
+  padding: var(--space-3);
+  overflow-y: auto;
+}
+
+/* Custom Scrollbar for Workspace */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-gray-300);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-gray-400);
+}
