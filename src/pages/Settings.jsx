@@ -144,10 +144,10 @@ export default function Settings() {
               <div style={{ display: 'grid', gap: '24px', maxWidth: '600px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px' }}>Permanent Enterprise SOC Dark Mode</div>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>Light mode is disabled to comply with 24/7 Security Operations Center low-light guidelines.</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px' }}>Google Material Design 3 Light Mode</div>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>Clean enterprise Light Mode styling active across all dashboard views.</div>
                   </div>
-                  <span className="badge badge-success">Enforced</span>
+                  <span className="badge badge-success">Active</span>
                 </div>
               </div>
             </div>
