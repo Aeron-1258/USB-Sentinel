@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { io } from "socket.io-client";
 import { fetchMetrics, fetchEndpointInfo } from "../../api";
 
 export default function Dashboard() {
@@ -48,7 +49,15 @@ export default function Dashboard() {
     }
     loadData();
     const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
+
+    // Live Windows system telemetry via WebSocket (no polling lag)
+    const socket = io(import.meta.env.VITE_WS_URL || "http://localhost:3001");
+    socket.on("endpoint_update", (data) => setEndpoint(data));
+    socket.on("connect", loadData);
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+    };
   }, []);
 
   return (
@@ -63,9 +72,26 @@ export default function Dashboard() {
             Security Operations Center (SOC)
           </h1>
           <p className="text-subtitle">
-            {endpoint
-              ? `Host: ${endpoint.hostname} (${endpoint.user}) | OS: ${endpoint.osVersion}`
-              : "Real-time USB Endpoint Defense & Forensic Telemetry"}
+            {endpoint ? (
+              <>
+                Host: <strong>{endpoint.hostname}</strong> ({endpoint.user}) | OS: {endpoint.osVersion} •{" "}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    color: "var(--color-green-600)",
+                  }}
+                >
+                  <span className="material-symbols-rounded pulse" style={{ fontSize: 12 }}>
+                    fiber_manual_record
+                  </span>
+                  Live • Uptime {endpoint.uptime}
+                </span>
+              </>
+            ) : (
+              "Real-time USB Endpoint Defense & Forensic Telemetry"
+            )}
           </p>
         </div>
         <div
@@ -567,7 +593,15 @@ export default function Dashboard() {
             </div>
             <div>
               <span style={{ color: "var(--color-text-tertiary)" }}>Domain / Workgroup:</span>
-              <div style={{ fontWeight: 600, marginTop: "2px" }}>{endpoint.domain}</div>
+              <div style={{ fontWeight: 600, marginTop: "2px" }}>{endpoint.domain || endpoint.workgroup || "N/A"}</div>
+            </div>
+            <div>
+              <span style={{ color: "var(--color-text-tertiary)" }}>Agent ID:</span>
+              <div style={{ fontWeight: 600, marginTop: "2px", fontFamily: "monospace", fontSize: "11px" }}>{endpoint.endpointId}</div>
+            </div>
+            <div>
+              <span style={{ color: "var(--color-text-tertiary)" }}>Processes:</span>
+              <div style={{ fontWeight: 600, marginTop: "2px" }}>{endpoint.totalProcesses ?? "—"}</div>
             </div>
             <div>
               <span style={{ color: "var(--color-text-tertiary)" }}>CPU:</span>

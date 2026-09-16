@@ -70,10 +70,15 @@ function runPsScript(scriptName) {
   });
 }
 
-// Poll endpoint telemetry
+// Poll endpoint telemetry — emit live updates to frontend via Socket.IO
 async function pollEndpointInfo() {
   const data = await runPsScript("get_endpoint.ps1");
-  if (data) cachedEndpoint = data;
+  if (data) {
+    const changed =
+      !cachedEndpoint || JSON.stringify(cachedEndpoint) !== JSON.stringify(data);
+    cachedEndpoint = data;
+    if (changed) io.emit("endpoint_update", data);
+  }
 }
 
 // Poll USB Devices & update state
@@ -234,14 +239,13 @@ app.post("/api/alerts/action", (req, res) => {
     return res.status(400).json({ error: "Invalid action payload", details: parsed.error.flatten() });
   }
   const { alertId, action, analystNote } = parsed.data;
-  const store = db.getDb();
-  const alert = store.alerts.find((a) => a.id === alertId);
-  if (!alert) return res.status(404).json({ error: "Alert not found" });
-  alert.status = action;
-  if (analystNote) alert.notes = analystNote;
-  alert.updatedAt = new Date().toISOString();
-  db.addAlert(alert);
-  res.json({ success: true });
+  const updated = db.updateAlert(alertId, {
+    status: action,
+    ...(analystNote ? { notes: analystNote } : {}),
+  });
+  if (!updated) return res.status(404).json({ error: "Alert not found" });
+  io.emit("alert_updated", updated);
+  res.json({ success: true, alert: updated });
 });
 
 app.get("/api/threats", (req, res) => {
@@ -378,6 +382,7 @@ app.post("/api/scan", async (req, res) => {
 
 io.on("connection", (socket) => {
   socket.emit("initial_devices", Array.from(activeDevices.values()));
+  if (cachedEndpoint) socket.emit("endpoint_update", cachedEndpoint);
 });
 
 const PORT = process.env.PORT || 3001;

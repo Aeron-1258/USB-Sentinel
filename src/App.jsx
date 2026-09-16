@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ThemeProvider } from "./context/ThemeContext";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./components/dashboard/Dashboard";
 import LiveMonitoring from "./pages/LiveMonitoring";
@@ -26,7 +27,7 @@ function App() {
   };
 
   return (
-    <>
+    <ThemeProvider>
       <AppLayout currentView={currentView} onNavigate={handleNavigate}>
         {currentView === "dashboard" && <Dashboard />}
         {currentView === "analytics" && <AnalyticsDashboard />}
@@ -48,7 +49,7 @@ function App() {
         {currentView === "settings" && <Settings />}
       </AppLayout>
       <Toaster richColors position="top-right" />
-    </>
+    </ThemeProvider>
   );
 }
 

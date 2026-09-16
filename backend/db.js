@@ -56,6 +56,15 @@ module.exports = {
     saveDb(db);
   },
 
+  updateAlert: (id, patch) => {
+    const db = loadDb();
+    const idx = db.alerts.findIndex((a) => a.id === id);
+    if (idx === -1) return null;
+    db.alerts[idx] = { ...db.alerts[idx], ...patch, updatedAt: new Date().toISOString() };
+    saveDb(db);
+    return db.alerts[idx];
+  },
+
   savePolicies: (policies) => {
     const db = loadDb();
     db.policies = policies;

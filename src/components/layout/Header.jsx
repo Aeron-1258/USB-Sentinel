@@ -1,6 +1,8 @@
 import React from "react";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function Header() {
+  const { theme, toggle } = useTheme();
   return (
     <header className="header">
       <div className="header-search">
@@ -11,6 +13,9 @@ export default function Header() {
       </div>
 
       <div className="header-actions">
+        <button className="btn-icon" onClick={toggle} title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>
+          <span className="material-symbols-rounded">{theme === "light" ? "dark_mode" : "light_mode"}</span>
+        </button>
         <button className="btn-icon">
           <span className="material-symbols-rounded">notifications</span>
         </button>
