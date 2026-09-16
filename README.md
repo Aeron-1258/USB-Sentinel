@@ -44,7 +44,7 @@ In enterprise environments, unauthorized USB storage devices pose critical secur
 │                               └────────────┬─────────────────┘   │
 │                                            │ REST + WebSocket    │
 │  ┌─────────────────────────────────────────▼──────────────────┐  │
-│  │  Frontend (Vite :5173)  React 19 + api.js Dual-Mode       │  │
+│  │  Frontend (Vite :5173)  React 19 + api.js Live Backend   │  │
 │  │  Dashboard / LiveMonitoring / DLP / Threat / Alerts        │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
@@ -61,38 +61,31 @@ In enterprise environments, unauthorized USB storage devices pose critical secur
 
 ---
 
-## ⚡ Automatic Dual-Mode Operation
+## ⚡ Live Enterprise Operation
 
-USB-Sentinel features an **Automatic Dual-Mode Architecture** designed for both enterprise production deployment and static portfolio demonstration:
+USB-Sentinel runs exclusively in **Live Enterprise Mode** — a real-time, hardware-backed security platform for Windows endpoints:
 
 ```
                       +------------------------------------------+
                       |          USB-Sentinel Frontend           |
                       +------------------------------------------+
                                            |
-                   Is Local Agent Service Running on Port 3001?
-                                 /                  \
-                                YES                  NO
-                               /                      \
-          +--------------------------+          +--------------------------+
-          | 🟢 LIVE ENTERPRISE MODE   |          | ⚡ DEMO MODE (PREVIEW)   |
-          | - Real Windows PnP Feed  |          | - Interactive Datasets   |
-          | - Live SHA-256 Hashing   |          | - Full UI Workflows      |
-          | - WMI Host Telemetry     |          | - Static / Web Preview   |
-          +--------------------------+          +--------------------------+
+                          Local Agent Service on Port 3001
+                                           |
+                          +--------------------------+
+                          | 🟢 LIVE ENTERPRISE MODE   |
+                          | - Real Windows PnP Feed  |
+                          | - Live SHA-256 Hashing   |
+                          | - WMI Host Telemetry     |
+                          +--------------------------+
 ```
 
-### 1. 🟢 Live Enterprise Mode (Company Endpoint Deployment)
-When the local background service is running (`http://localhost:3001` reachable within 1.5s via `src/api.js:104`):
-- Frontend maintains persistent **WebSocket + REST** connection to `http://localhost:3001`.
+When the local background service is running (`http://localhost:3001` via `src/api.js:104`):
+- Frontend maintains a persistent **WebSocket + REST** connection to `http://localhost:3001`.
 - Displays green **`🟢 LIVE ENTERPRISE MODE`** badge (`src/pages/LiveMonitoring.jsx:94`).
-- Hardware insertions, file transfers, and telemetry are **100% authentic, real-time OS data**.
+- All hardware insertions, file transfers, and system telemetry represent **100% authentic, real-time operating system data**.
 
-### 2. ⚡ Demo Mode (Static Web / Portfolio Preview)
-When hosted statically (GitHub Pages, Vercel) or backend is offline:
-- System detects offline agent within **1.5 seconds** (`AbortSignal.timeout(1500)`).
-- Displays amber **`⚡ DEMO MODE (PREVIEW)`** badge.
-- Dashboard, inventory, DLP, and threat feeds remain **100% interactive** using `src/api.js:4` mock datasets (`DEMO_DEVICES`, `DEMO_ALERTS`, etc.).
+No mock or simulated data is used — the platform requires the backend agent to be active.
 
 ---
 
@@ -183,11 +176,10 @@ Get-Content .\frontend.log -Tail 20
 
 ---
 
-### Option C: Production Build (Static Hosting / Demo)
+### Option C: Production Build
 ```bash
 npm run build        # outputs to dist/
 npm run preview      # preview production build
-# Deploy dist/ to Vercel / GitHub Pages — automatically runs in DEMO MODE
 ```
 
 ---
@@ -235,7 +227,7 @@ USB-Sentinel/
 ├── start_frontend.ps1            # Hidden frontend wrapper (auto-restart)
 ├── start_frontend_hidden.cmd     # Click-to-launch frontend hidden
 ├── src/
-│   ├── api.js                    # Dual-mode fetch + DEMO_* fallbacks (1500ms timeout)
+│   ├── api.js                    # Live backend API client (REST + WebSocket)
 │   ├── pages/LiveMonitoring.jsx  # Real-time PnP feed + Socket.IO
 │   └── components/dashboard/     # SOC 15-card telemetry
 ├── backend/
@@ -246,7 +238,7 @@ USB-Sentinel/
 │   ├── service_wrapper.ps1       # (generated) hidden node loop + port 3001 guard
 │   ├── start_hidden.cmd          # (generated) task launcher
 │   ├── service.log               # Runtime logs
-│   ├── install_service.ps1       # Dual-mode Admin/SYSTEM vs Non-Admin installer
+│   ├── install_service.ps1       # Admin (SYSTEM) vs Non-Admin installer
 │   └── scripts/
 │       ├── get_pnp_devices.ps1   # USB/USBSTOR/DiskDrive/HID/Bluetooth enumerator
 │       └── get_endpoint.ps1      # Host telemetry (COMPUTERNAME, CIM, uptime)
@@ -259,11 +251,11 @@ USB-Sentinel/
 
 > **Commit `5e8abd2` — Backend monitoring, service wrapper and frontend integration**
 
-- **Fixed `install_service.ps1`**: Dual-path installer — Scheduled Task (SYSTEM, AtLogOn+AtStartup, auto-restart) + native Windows Service with `sc.exe` recovery; non-admin fallback via Startup LNK + HKCU Run; hidden `service_wrapper.ps1` with stale `:3001` guard and crash-restart loop (`backend/install_service.ps1:30`).
+- **Fixed `install_service.ps1`**: Enterprise installer — Scheduled Task (SYSTEM, AtLogOn+AtStartup, auto-restart) + native Windows Service with `sc.exe` recovery; non-admin fallback via Startup LNK + HKCU Run; hidden `service_wrapper.ps1` with stale `:3001` guard and crash-restart loop (`backend/install_service.ps1:30`).
 - **Enhanced PnP Detection** (`backend/scripts/get_pnp_devices.ps1:41`): Now queries `USB, USBSTOR, DiskDrive, HIDClass, Bluetooth`, fixes `$PID` reserved-variable collision (`$pidVal`), tags `isStorage/isHub/category` correctly, and recovers orphan `Win32_DiskDrive` volumes missing from PnP.
 - **Improved Metrics** (`backend/server.js:199`): Separates `totalDevices` (all PnP) vs `totalStorageDevices` (DLP-relevant removable drives) vs `totalPeripherals/totalHubs`; frontend cards now show `Removable Storage: N / Total PnP: M (periph + hubs)` to avoid confusion.
 - **File Auditor Fix** (`backend/file_auditor.js:83`): Renamed `pid` → `devicePid` to avoid collision with process PID in audit logs.
-- **Frontend Dual-Mode Hardening** (`src/api.js:104`, `src/pages/LiveMonitoring.jsx:22`): 1.5s timeout probes, `getActiveMode()` sync, Socket.IO `connect`/`connect_error` badges, `isStorageDevice()` helper for consistent counting.
+- **Frontend Hardening** (`src/api.js:104`, `src/pages/LiveMonitoring.jsx:22`): Live backend connectivity checks, Socket.IO `connect`/`connect_error` handling, `isStorageDevice()` helper for consistent Storage vs Peripheral counting.
 - **Background Launchers**: Added `start_frontend.ps1` + `start_frontend_hidden.cmd` and `backend/service_wrapper.ps1` + `backend/start_hidden.cmd` for hidden auto-restart operation.
 
 ---
@@ -273,7 +265,7 @@ USB-Sentinel/
 | Issue | Fix |
 |---|---|
 | `PORT 3001 already in use` | Wrapper auto-kills stale node via `Get-NetTCPConnection -LocalPort 3001` (`backend/service_wrapper.ps1:6`). Manual: `Get-NetTCPConnection -LocalPort 3001 \| % {Stop-Process $_.OwningProcess -Force}` |
-| `DEMO MODE` even with backend running | Check `http://localhost:3001/api/devices` in browser; if OK, firewall is blocking `fetch` — allow `node.exe` through Defender Firewall |
+| Backend not reachable | Check `http://localhost:3001/api/devices` in browser; if OK, firewall is blocking `fetch` — allow `node.exe` through Defender Firewall |
 | `No devices show` but USB plugged | Run `powershell -File .\backend\scripts\get_pnp_devices.ps1` manually; if empty, run PowerShell as Admin (WMI needs elevation for some classes) |
 | `file_event` not firing | Ensure drive has letter (E:\, F:\) and is not BitLocker-locked; check `backend/service.log` for `[FileAuditor] Starting watcher` |
 | Service fails to start | View `backend/service.log`; check `Get-WinEvent -LogName System \| ? Message -like "*USBEnterpriseMonitor*"` |
@@ -282,4 +274,4 @@ USB-Sentinel/
 
 ## 📜 License & Compliance
 
-Distributed under the **MIT License**. Suitable for enterprise internal deployment, security auditing, and portfolio demonstrations.
+Distributed under the **MIT License**. Suitable for enterprise internal deployment and security auditing.
