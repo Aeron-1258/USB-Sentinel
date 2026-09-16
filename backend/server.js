@@ -6,12 +6,10 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { z } = require("zod");
-const bcrypt = require("bcryptjs");
 const { exec } = require("child_process");
 const path = require("path");
 const db = require("./db");
 const FileAuditor = require("./file_auditor");
-const { signToken, authMiddleware, requireRole } = require("./middleware/auth");
 
 const app = express();
 
@@ -20,7 +18,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : process.env.FRONTEND_URL
     ? [process.env.FRONTEND_URL]
-    : true; // true = allow all origins in dev if no env set
+    : true;
 
 app.use(helmet());
 app.use(
@@ -32,7 +30,7 @@ app.use(
 );
 app.use(express.json({ limit: "100kb" }));
 
-// Rate limiting — global + stricter on auth
+// Rate limiting — global
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
@@ -41,14 +39,6 @@ const globalLimiter = rateLimit({
   message: { error: "Too many requests, please try again later" },
 });
 app.use(globalLimiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many login attempts" },
-});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -101,7 +91,6 @@ async function pollPnpDevices() {
     if (!activeDevices.has(key)) {
       console.log(`[PnP Engine] Connected: ${dev.name} (${dev.vid}:${dev.pid})`);
 
-      // Enrich dev with deep SOC metrics
       const enrichedDev = {
         ...dev,
         connectTime: new Date().toISOString().replace("T", " ").substring(0, 19),
@@ -128,9 +117,7 @@ async function pollPnpDevices() {
       const alertEvt = {
         id: `ALT-${Date.now()}`,
         timestamp: enrichedDev.connectTime,
-        title: isUnknown
-          ? "Unrecognized USB Hardware (BadUSB Flagged)"
-          : "USB PnP Hardware Connected",
+        title: isUnknown ? "Unrecognized USB Hardware (BadUSB Flagged)" : "USB PnP Hardware Connected",
         severity: isUnknown ? "Critical" : "Low",
         device: dev.name,
         vid: dev.vid,
@@ -169,7 +156,6 @@ async function pollPnpDevices() {
     }
   });
 
-  // Check removals
   for (const [key, dev] of activeDevices.entries()) {
     if (!currentKeys.has(key)) {
       console.log(`[PnP Engine] Removed: ${dev.name}`);
@@ -188,47 +174,7 @@ pollPnpDevices();
 setInterval(pollPnpDevices, 2000);
 setInterval(pollEndpointInfo, 10000);
 
-// In-memory users — seeded from env or defaults (replace with DB for prod)
-const USERS = [
-  {
-    id: "u_admin",
-    username: process.env.ADMIN_USER || "admin",
-    // bcrypt hash for 'Admin@123' — generated with bcrypt.hashSync('Admin@123', 10)
-    passwordHash:
-      process.env.ADMIN_HASH || "$2a$10$D9I3a4n2wJvQwQF7kQwQOeH7Y3YvPqZ3YvPqZ3YvPqZ3YvPqZ3YvPqZ3YvPqZ3YvPqZ",
-    role: "admin",
-  },
-  {
-    id: "u_analyst",
-    username: process.env.ANALYST_USER || "analyst",
-    passwordHash:
-      process.env.ANALYST_HASH || "$2a$10$D9I3a4n2wJvQwQF7kQwQOeH7Y3YvPqZ3YvPqZ3YvPqZ3YvPqZ3YvPqZ",
-    role: "analyst",
-  },
-];
-// Ensure default password works: lazily hash 'Admin@123' / 'Analyst@123' if env not set properly
-(function seedPasswords() {
-  const adminPlain = "Admin@123";
-  const analystPlain = "Analyst@123";
-  try {
-    const bcryptCheck = require("bcryptjs");
-    // If env hash fails to verify, replace with fresh hash
-    if (!bcryptCheck.compareSync(adminPlain, USERS[0].passwordHash)) {
-      USERS[0].passwordHash = bcryptCheck.hashSync(adminPlain, 10);
-    }
-    if (!bcryptCheck.compareSync(analystPlain, USERS[1].passwordHash)) {
-      USERS[1].passwordHash = bcryptCheck.hashSync(analystPlain, 10);
-    }
-  } catch (_) {}
-})();
-
-// Zod schemas
-const loginSchema = z.object({
-  username: z.string().min(3).max(32),
-  password: z.string().min(6).max(128),
-});
-
-// Health check — lightweight probe for monitors / load balancers / resume credibility
+// Health check
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -238,25 +184,6 @@ app.get("/api/health", (req, res) => {
     activeDevices: activeDevices.size,
     endpoint: cachedEndpoint ? cachedEndpoint.hostname : "SECURE-ENDPOINT-01",
   });
-});
-
-// Auth routes
-app.post("/api/auth/login", authLimiter, async (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Invalid credentials format", details: parsed.error.flatten() });
-  }
-  const { username, password } = parsed.data;
-  const user = USERS.find((u) => u.username === username);
-  if (!user) return res.status(401).json({ error: "Invalid username or password" });
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: "Invalid username or password" });
-  const token = signToken({ id: user.id, username: user.username, role: user.role });
-  res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
-});
-
-app.get("/api/auth/me", authMiddleware, (req, res) => {
-  res.json({ user: req.user });
 });
 
 // REST API ROUTES
@@ -301,7 +228,7 @@ const alertActionSchema = z.object({
   analystNote: z.string().max(500).optional(),
 });
 
-app.post("/api/alerts/action", authMiddleware, requireRole("admin", "analyst"), (req, res) => {
+app.post("/api/alerts/action", (req, res) => {
   const parsed = alertActionSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid action payload", details: parsed.error.flatten() });
@@ -312,7 +239,6 @@ app.post("/api/alerts/action", authMiddleware, requireRole("admin", "analyst"), 
   if (!alert) return res.status(404).json({ error: "Alert not found" });
   alert.status = action;
   if (analystNote) alert.notes = analystNote;
-  alert.updatedBy = req.user.username;
   alert.updatedAt = new Date().toISOString();
   db.addAlert(alert);
   res.json({ success: true });
@@ -374,7 +300,6 @@ app.get("/api/metrics", (req, res) => {
     totalStorageDevices: storageDevices.length,
     totalPeripherals: peripheralDevices.length,
     totalHubs: hubDevices.length,
-    // storage count is what SOC cares about for "plugged" drives; totalDevices keeps backwards compat
     quarantinedCount: store.alerts.filter((a) => a.severity === "Critical").length,
     spoofAttempts: store.alerts.filter(
       (a) => a.title.includes("BadUSB") || a.title.includes("Unrecognized")
@@ -384,7 +309,6 @@ app.get("/api/metrics", (req, res) => {
     onlineAgents: 1,
     endpointStatus: "Protected",
     activeSessions: storageDevices.length,
-    // keep activeSessions as storage sessions for DLP relevance, totalSessions for info
     totalSessions: devices.length,
     policyViolations: store.alerts.length,
     malwareAlerts: 0,
@@ -392,7 +316,7 @@ app.get("/api/metrics", (req, res) => {
   });
 });
 
-// Policy CRUD — allowlist/blocklist with VID:PID validation
+// Policy CRUD — allowlist/blocklist with VID:PID validation (open, no auth)
 const vidPidRegex = /^0x[0-9A-Fa-f]{4}$/;
 const policySchema = z.object({
   vid: z.string().regex(vidPidRegex, "VID must be 0xXXXX"),
@@ -403,7 +327,7 @@ const policySchema = z.object({
   reason: z.string().max(256).optional(),
 });
 
-app.get("/api/policies", authMiddleware, (req, res) => {
+app.get("/api/policies", (req, res) => {
   const { type } = req.query;
   const all = db.getDb().policies || [];
   if (type && (type === "Allowlist" || type === "Blocklist")) {
@@ -412,7 +336,7 @@ app.get("/api/policies", authMiddleware, (req, res) => {
   res.json(all);
 });
 
-app.post("/api/policies", authMiddleware, requireRole("admin"), (req, res) => {
+app.post("/api/policies", (req, res) => {
   const parsed = policySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid policy", details: parsed.error.flatten() });
@@ -423,20 +347,20 @@ app.post("/api/policies", authMiddleware, requireRole("admin"), (req, res) => {
   const policy = {
     id: `POL-${Date.now()}`,
     ...data,
-    createdBy: req.user.username,
+    createdBy: "system",
     createdAt: new Date().toISOString(),
   };
   db.addPolicy(policy);
   res.status(201).json(policy);
 });
 
-app.delete("/api/policies/:id", authMiddleware, requireRole("admin"), (req, res) => {
+app.delete("/api/policies/:id", (req, res) => {
   const ok = db.removePolicy(req.params.id);
   if (!ok) return res.status(404).json({ error: "Policy not found" });
   res.json({ success: true });
 });
 
-app.put("/api/policies/:id", authMiddleware, requireRole("admin"), (req, res) => {
+app.put("/api/policies/:id", (req, res) => {
   const patch = {};
   if (req.body.reason !== undefined) patch.reason = String(req.body.reason).slice(0, 256);
   if (req.body.vendor !== undefined) patch.vendor = String(req.body.vendor).slice(0, 64);
@@ -446,10 +370,10 @@ app.put("/api/policies/:id", authMiddleware, requireRole("admin"), (req, res) =>
   res.json(updated);
 });
 
-app.post("/api/scan", authMiddleware, async (req, res) => {
+app.post("/api/scan", async (req, res) => {
   await pollEndpointInfo();
   await pollPnpDevices();
-  res.json({ status: "Scan completed", timestamp: new Date().toISOString(), by: req.user.username });
+  res.json({ status: "Scan completed", timestamp: new Date().toISOString() });
 });
 
 io.on("connection", (socket) => {

@@ -1,15 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
-function authHeaders() {
-  const token = localStorage.getItem("usb_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function authFetch(url, opts = {}) {
-  const headers = { ...(opts.headers || {}), ...authHeaders() };
-  return fetch(url, { ...opts, headers });
-}
-
 // Rich Mock Data for Demo Mode Fallback
 const DEMO_ENDPOINT = {
   hostname: "DEMO-ENDPOINT-01",
@@ -158,7 +148,7 @@ const DEMO_ALERTS = [
   },
 ];
 
-let activeMode = "UNKNOWN"; // 'LIVE' or 'DEMO'
+let activeMode = "UNKNOWN";
 
 export async function checkMode() {
   try {
@@ -229,14 +219,14 @@ export async function fetchFileEvents() {
 
 export async function fetchAlerts() {
   try {
-    const res = await authFetch(`${BASE_URL}/alerts`, { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(`${BASE_URL}/alerts`, { signal: AbortSignal.timeout(1500) });
     if (res.ok) return await res.json();
   } catch (e) {}
   return DEMO_ALERTS;
 }
 
 export async function alertAction(alertId, action, analystNote) {
-  const res = await authFetch(`${BASE_URL}/alerts/action`, {
+  const res = await fetch(`${BASE_URL}/alerts/action`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ alertId, action, analystNote }),
@@ -248,13 +238,13 @@ export async function alertAction(alertId, action, analystNote) {
 
 export async function fetchPolicies(type) {
   const qs = type ? `?type=${type}` : "";
-  const res = await authFetch(`${BASE_URL}/policies${qs}`);
+  const res = await fetch(`${BASE_URL}/policies${qs}`);
   if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch policies");
   return await res.json();
 }
 
 export async function createPolicy(payload) {
-  const res = await authFetch(`${BASE_URL}/policies`, {
+  const res = await fetch(`${BASE_URL}/policies`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -265,7 +255,7 @@ export async function createPolicy(payload) {
 }
 
 export async function deletePolicy(id) {
-  const res = await authFetch(`${BASE_URL}/policies/${id}`, { method: "DELETE" });
+  const res = await fetch(`${BASE_URL}/policies/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error((await res.json()).error || "Delete failed");
   return await res.json();
 }
@@ -296,7 +286,7 @@ export async function fetchMetrics() {
 
 export async function triggerLiveScan() {
   try {
-    const res = await authFetch(`${BASE_URL}/scan`, {
+    const res = await fetch(`${BASE_URL}/scan`, {
       method: "POST",
       signal: AbortSignal.timeout(1500),
     });

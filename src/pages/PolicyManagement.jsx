@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from "react";
 import PolicyCard from "../components/policy/PolicyCard";
 import { fetchPolicies, createPolicy, deletePolicy } from "../api";
-import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
 export default function PolicyManagement() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
   const [activeTab, setActiveTab] = useState("allowlist");
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +60,6 @@ export default function PolicyManagement() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!isAdmin) return toast.error("Only admin can create policies");
     try {
       await createPolicy({ vid: formVid, pid: formPid, vendor: formVendor, type: formType });
       toast.success(`Policy ${formVid}:${formPid} → ${formType}`);
@@ -77,7 +73,6 @@ export default function PolicyManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!isAdmin) return toast.error("Only admin can delete");
     try {
       await deletePolicy(id);
       toast.success("Policy removed");
@@ -247,22 +242,12 @@ export default function PolicyManagement() {
             <option value="Blocklist">Blocklist</option>
           </select>
         </div>
-        <button
-          className="btn btn-primary"
-          type="submit"
-          disabled={!isAdmin}
-          style={{ height: 36 }}
-        >
+        <button className="btn btn-primary" type="submit" style={{ height: 36 }}>
           <span className="material-symbols-rounded" style={{ fontSize: 18 }}>
             add
           </span>
-          {isAdmin ? "Add Policy" : "Admin only"}
+          Add Policy
         </button>
-        {!isAdmin && (
-          <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
-            Analyst role is read-only
-          </span>
-        )}
         {loading && <span style={{ fontSize: 12 }}>Loading...</span>}
       </form>
 

@@ -1,6 +1,4 @@
 import React, { useState } from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import Login from "./pages/Login";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./components/dashboard/Dashboard";
 import LiveMonitoring from "./pages/LiveMonitoring";
@@ -16,8 +14,7 @@ import SecurityReports from "./pages/SecurityReports";
 import Settings from "./pages/Settings";
 import { Toaster } from "sonner";
 
-function AppInner() {
-  const { isAuthenticated, loading, logout, user } = useAuth();
+function App() {
   const [currentView, setCurrentView] = useState("dashboard");
   const [activeDeviceId, setActiveDeviceId] = useState(null);
 
@@ -28,28 +25,9 @@ function AppInner() {
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}
-      >
-        <span className="material-symbols-rounded pulse">sync</span> Loading...
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Login onSuccess={() => setCurrentView("dashboard")} />;
-  }
-
   return (
     <>
-      <AppLayout
-        currentView={currentView}
-        onNavigate={handleNavigate}
-        user={user}
-        onLogout={logout}
-      >
+      <AppLayout currentView={currentView} onNavigate={handleNavigate}>
         {currentView === "dashboard" && <Dashboard />}
         {currentView === "analytics" && <AnalyticsDashboard />}
         {currentView === "inventory" && (
@@ -71,14 +49,6 @@ function AppInner() {
       </AppLayout>
       <Toaster richColors position="top-right" />
     </>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppInner />
-    </AuthProvider>
   );
 }
 
