@@ -80,7 +80,7 @@ class FileAuditor {
           action: fileEvt.action,
           device: deviceName,
           vid: '0xUSB',
-          pid: '0xDEV',
+          devicePid: '0xDEV',
           serial: 'SN-LIVE',
           hash: hashes.sha256,
           result: 'Success',

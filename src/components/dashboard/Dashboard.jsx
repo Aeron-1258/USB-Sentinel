@@ -4,6 +4,9 @@ import { fetchMetrics, fetchEndpointInfo } from '../../api';
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
     totalDevices: 1,
+    totalStorageDevices: 0,
+    totalPeripherals: 0,
+    totalHubs: 0,
     authorizedDevices: 1,
     blockedDevices: 0,
     unknownDevices: 0,
@@ -28,11 +31,17 @@ export default function Dashboard() {
       if (m) {
         setMetrics(prev => ({
           ...prev,
-          totalDevices: m.totalDevices || 1,
+          totalDevices: m.totalDevices ?? prev.totalDevices,
+          totalStorageDevices: m.totalStorageDevices ?? 0,
+          totalPeripherals: m.totalPeripherals ?? 0,
+          totalHubs: m.totalHubs ?? 0,
           quarantinedCount: m.quarantinedCount || 0,
           spoofAttempts: m.spoofAttempts || 0,
           unsignedDrivers: m.unsignedDrivers || 0,
-          avgTrustScore: m.avgTrustScore || 98
+          avgTrustScore: m.avgTrustScore || 98,
+          activeSessions: m.activeSessions ?? prev.activeSessions,
+          policyViolations: m.policyViolations ?? prev.policyViolations,
+          threatFeedMatches: m.threatFeedMatches ?? prev.threatFeedMatches
         }));
       }
       if (ep) setEndpoint(ep);
@@ -66,12 +75,12 @@ export default function Dashboard() {
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--space-2)' }}>
           
-          <div className="card" style={{ padding: '12px 16px' }}>
+          <div className="card" style={{ padding: '12px 16px', borderLeft: metrics.totalStorageDevices === 0 ? '3px solid var(--color-green-500)' : '3px solid var(--color-blue-500)' }}>
             <div className="text-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-              <span className="material-symbols-rounded" style={{ color: 'var(--color-blue-500)', fontSize: '16px' }}>usb</span> Connected USBs
+              <span className="material-symbols-rounded" style={{ color: 'var(--color-blue-500)', fontSize: '16px' }}>usb</span> Removable Storage
             </div>
-            <div style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px' }}>{metrics.totalDevices}</div>
-            <div style={{ color: 'var(--color-green-600)', fontSize: '11px', marginTop: '2px', fontWeight: 600 }}>PnP Bus Live</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: metrics.totalStorageDevices > 0 ? 'var(--color-blue-600)' : 'var(--color-green-600)' }}>{metrics.totalStorageDevices ?? 0}</div>
+            <div style={{ color: 'var(--color-text-tertiary)', fontSize: '11px', marginTop: '2px' }} title="Total PnP USB devices includes keyboards, mice, hubs and storage. Storage count = removable drives only.">Total PnP: {metrics.totalDevices} ({metrics.totalPeripherals ?? 0} peripherals{metrics.totalHubs ? ` + ${metrics.totalHubs} hubs` : ''})</div>
           </div>
 
           <div className="card" style={{ padding: '12px 16px' }}>

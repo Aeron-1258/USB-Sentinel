@@ -54,7 +54,12 @@ export default function LiveMonitoring({ onDeviceClick }) {
     };
   }, []);
 
+  const isStorageDevice = (d) => d.isStorage === true || d.category === 'Storage' || (d.mountPoint && d.mountPoint !== 'N/A');
   const totalConnected = devices.length;
+  const storageDevices = devices.filter(isStorageDevice);
+  const peripheralCount = devices.filter(d => !isStorageDevice(d) && (d.category === 'Peripheral' || d.class === 'HIDClass' || d.class === 'Bluetooth')).length;
+  const hubCount = devices.filter(d => d.isHub || d.category === 'Hub').length;
+  const storageCount = storageDevices.length;
   const authorizedCount = devices.filter(d => d.status === 'Authorized' || !d.status).length;
   const blockedCount = devices.filter(d => d.status === 'Blocked').length;
   const unknownCount = devices.filter(d => d.vid === 'Unknown').length;
@@ -102,11 +107,12 @@ export default function LiveMonitoring({ onDeviceClick }) {
         </div>
       </div>
 
-      {/* 2. SUMMARY CARDS */}
+      {/* 2. SUMMARY CARDS — Storage is the DLP-relevant count */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 'var(--space-2)', flexShrink: 0 }}>
-        <div className="card" style={{ padding: '12px 14px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>Connected</div>
-          <div style={{ fontSize: '20px', fontWeight: 700, marginTop: '4px', color: 'var(--color-blue-600)' }}>{totalConnected}</div>
+        <div className="card" style={{ padding: '12px 14px', borderLeft: storageCount === 0 ? '3px solid var(--color-green-500)' : '3px solid var(--color-blue-500)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>Removable Storage</div>
+          <div style={{ fontSize: '20px', fontWeight: 700, marginTop: '4px', color: storageCount > 0 ? 'var(--color-blue-600)' : 'var(--color-green-600)' }}>{storageCount}</div>
+          <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginTop: '2px' }} title="Total PnP includes all USB peripherals; Storage = removable drives only.">Total PnP: {totalConnected}{hubCount ? ` (${peripheralCount} periph + ${hubCount} hubs)` : ` (${peripheralCount} periph)`}</div>
         </div>
         <div className="card" style={{ padding: '12px 14px' }}>
           <div style={{ fontSize: '11px', color: 'var(--color-green-600)', fontWeight: 600, textTransform: 'uppercase' }}>Authorized</div>
@@ -178,7 +184,10 @@ export default function LiveMonitoring({ onDeviceClick }) {
                     <span className="material-symbols-rounded">usb</span>
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{dev.name}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {dev.name}
+                      <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '10px', fontWeight: 700, backgroundColor: (dev.isStorage || dev.category === 'Storage') ? 'var(--color-blue-50)' : dev.category === 'Hub' ? 'var(--color-yellow-50)' : 'var(--color-green-50)', color: (dev.isStorage || dev.category === 'Storage') ? 'var(--color-blue-600)' : dev.category === 'Hub' ? 'var(--color-yellow-700)' : 'var(--color-text-secondary)', border: '1px solid var(--color-border-light)' }}>{dev.category || ((dev.isStorage || dev.mountPoint !== 'N/A') ? 'Storage' : 'Peripheral')}</span>
+                    </div>
                     <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{dev.manufacturer || dev.vendor || 'Generic'} • {dev.class || 'USB'}</div>
                     <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{dev.serial}</div>
                   </div>

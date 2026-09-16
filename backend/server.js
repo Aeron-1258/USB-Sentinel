@@ -112,7 +112,7 @@ async function pollPnpDevices() {
         action: 'Driver Loaded (Event ID 20001)',
         device: dev.name,
         vid: dev.vid,
-        pid: dev.pid,
+        devicePid: dev.pid,
         serial: dev.serial || 'N/A',
         hash: 'N/A',
         result: 'Success',
@@ -149,7 +149,15 @@ app.get('/api/endpoint', (req, res) => {
 });
 
 app.get('/api/devices', (req, res) => {
-  res.json(Array.from(activeDevices.values()));
+  const all = Array.from(activeDevices.values());
+  const { type } = req.query;
+  if (type === 'storage') {
+    return res.json(all.filter(d => d.isStorage === true || d.category === 'Storage' || (d.mountPoint && d.mountPoint !== 'N/A')));
+  }
+  if (type === 'peripheral') {
+    return res.json(all.filter(d => !d.isStorage && d.category !== 'Storage'));
+  }
+  res.json(all);
 });
 
 app.get('/api/audit-logs', (req, res) => {
@@ -188,16 +196,25 @@ app.get('/api/threats', (req, res) => {
 app.get('/api/metrics', (req, res) => {
   const store = db.getDb();
   const devices = Array.from(activeDevices.values());
+  const storageDevices = devices.filter(d => d.isStorage === true || d.category === 'Storage' || (d.mountPoint && d.mountPoint !== 'N/A'));
+  const peripheralDevices = devices.filter(d => !storageDevices.includes(d) && d.category === 'Peripheral');
+  const hubDevices = devices.filter(d => d.isHub === true || d.category === 'Hub');
 
   res.json({
     totalDevices: devices.length,
+    totalStorageDevices: storageDevices.length,
+    totalPeripherals: peripheralDevices.length,
+    totalHubs: hubDevices.length,
+    // storage count is what SOC cares about for "plugged" drives; totalDevices keeps backwards compat
     quarantinedCount: store.alerts.filter(a => a.severity === 'Critical').length,
     spoofAttempts: store.alerts.filter(a => a.title.includes('BadUSB') || a.title.includes('Unrecognized')).length,
     unsignedDrivers: devices.filter(d => d.vid === 'Unknown').length,
     avgTrustScore: devices.length > 0 ? 94 : 100,
     onlineAgents: 1,
     endpointStatus: 'Protected',
-    activeSessions: devices.length,
+    activeSessions: storageDevices.length,
+    // keep activeSessions as storage sessions for DLP relevance, totalSessions for info
+    totalSessions: devices.length,
     policyViolations: store.alerts.length,
     malwareAlerts: 0,
     threatFeedMatches: 3

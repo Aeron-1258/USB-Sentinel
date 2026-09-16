@@ -36,7 +36,10 @@ const DEMO_DEVICES = [
     mountPoint: 'E:\\',
     fileSystem: 'exFAT',
     capacity: '64.0 GB',
-    isSigned: true
+    isSigned: true,
+    isStorage: true,
+    isHub: false,
+    category: 'Storage'
   },
   {
     id: 'DEV-0x0930-0x6545',
@@ -54,7 +57,10 @@ const DEMO_DEVICES = [
     mountPoint: 'F:\\',
     fileSystem: 'NTFS',
     capacity: '128.0 GB',
-    isSigned: false
+    isSigned: false,
+    isStorage: true,
+    isHub: false,
+    category: 'Storage'
   },
   {
     id: 'DEV-0x046D-0xC52B',
@@ -72,7 +78,10 @@ const DEMO_DEVICES = [
     mountPoint: 'N/A',
     fileSystem: 'N/A',
     capacity: 'N/A',
-    isSigned: true
+    isSigned: true,
+    isStorage: false,
+    isHub: false,
+    category: 'Peripheral'
   }
 ];
 
@@ -171,6 +180,9 @@ export async function fetchMetrics() {
   } catch (e) {}
   return {
     totalDevices: 3,
+    totalStorageDevices: 2,
+    totalPeripherals: 1,
+    totalHubs: 0,
     quarantinedCount: 1,
     spoofAttempts: 1,
     unsignedDrivers: 1,
@@ -178,6 +190,7 @@ export async function fetchMetrics() {
     onlineAgents: 1,
     endpointStatus: 'Protected (Demo Mode)',
     activeSessions: 2,
+    totalSessions: 3,
     policyViolations: 1,
     malwareAlerts: 0,
     threatFeedMatches: 1
