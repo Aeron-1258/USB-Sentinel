@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
+import { SearchProvider } from "./context/SearchContext";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./components/dashboard/Dashboard";
 import LiveMonitoring from "./pages/LiveMonitoring";
@@ -28,27 +29,29 @@ function App() {
 
   return (
     <ThemeProvider>
-      <AppLayout currentView={currentView} onNavigate={handleNavigate}>
-        {currentView === "dashboard" && <Dashboard />}
-        {currentView === "analytics" && <AnalyticsDashboard />}
-        {currentView === "inventory" && (
-          <DeviceInventory onDeviceClick={(id) => handleNavigate("device-details", id)} />
-        )}
-        {currentView === "monitoring" && (
-          <LiveMonitoring onDeviceClick={(id) => handleNavigate("device-details", id)} />
-        )}
-        {currentView === "device-details" && (
-          <DeviceDetails deviceId={activeDeviceId} onBack={() => handleNavigate("inventory")} />
-        )}
-        {currentView === "policy" && <PolicyManagement />}
-        {currentView === "file-monitoring" && <FileMonitoring />}
-        {currentView === "threats" && <ThreatDetectionCenter />}
-        {currentView === "alerts" && <AlertsCenter />}
-        {currentView === "audit-logs" && <AuditLogs />}
-        {currentView === "reports" && <SecurityReports />}
-        {currentView === "settings" && <Settings />}
-      </AppLayout>
-      <Toaster richColors position="top-right" />
+      <SearchProvider>
+        <AppLayout currentView={currentView} onNavigate={handleNavigate}>
+          {currentView === "dashboard" && <Dashboard />}
+          {currentView === "analytics" && <AnalyticsDashboard />}
+          {currentView === "inventory" && (
+            <DeviceInventory onDeviceClick={(id) => handleNavigate("device-details", id)} />
+          )}
+          {currentView === "monitoring" && (
+            <LiveMonitoring onDeviceClick={(id) => handleNavigate("device-details", id)} />
+          )}
+          {currentView === "device-details" && (
+            <DeviceDetails deviceId={activeDeviceId} onBack={() => handleNavigate("inventory")} />
+          )}
+          {currentView === "policy" && <PolicyManagement />}
+          {currentView === "file-monitoring" && <FileMonitoring />}
+          {currentView === "threats" && <ThreatDetectionCenter />}
+          {currentView === "alerts" && <AlertsCenter />}
+          {currentView === "audit-logs" && <AuditLogs />}
+          {currentView === "reports" && <SecurityReports />}
+          {currentView === "settings" && <Settings />}
+        </AppLayout>
+        <Toaster richColors position="top-right" />
+      </SearchProvider>
     </ThemeProvider>
   );
 }

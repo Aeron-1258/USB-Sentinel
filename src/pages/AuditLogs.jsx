@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { fetchAuditLogs } from "../api";
+import { useSearch } from "../context/SearchContext";
+import { Skeleton } from "../components/common/Skeleton";
 
 export default function AuditLogs() {
+  const { query: globalQuery } = useSearch();
   const [logs, setLogs] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const rowsPerPage = 12;
+
+  const effectiveQuery = globalQuery || searchQuery;
 
   useEffect(() => {
     async function loadLogs() {
       const data = await fetchAuditLogs();
       setLogs(data);
+      setLoading(false);
     }
     loadLogs();
     const interval = setInterval(loadLogs, 3000);
@@ -22,7 +29,7 @@ export default function AuditLogs() {
       (val) =>
         val !== null &&
         val !== undefined &&
-        val.toString().toLowerCase().includes(searchQuery.toLowerCase())
+        val.toString().toLowerCase().includes(effectiveQuery.toLowerCase())
     )
   );
 
@@ -74,19 +81,29 @@ export default function AuditLogs() {
           flexShrink: 0,
         }}
       >
-        <div className="input-group" style={{ width: "400px", height: "36px" }}>
-          <span className="material-symbols-rounded" style={{ fontSize: "18px" }}>
-            search
-          </span>
-          <input
-            type="text"
-            placeholder="Search Hashes, PIDs, Users, or Endpoints..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-          />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="input-group" style={{ width: "400px", height: "36px" }}>
+            <span className="material-symbols-rounded" style={{ fontSize: "18px" }}>
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Search Hashes, PIDs, Users, or Endpoints... (/ to focus header)"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+          {effectiveQuery && (
+            <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+              {filteredLogs.length} matches for "{effectiveQuery}"
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
+          Live • {logs.length} total • Page {currentPage}/{Math.ceil(filteredLogs.length / rowsPerPage) || 1}
         </div>
       </div>
 

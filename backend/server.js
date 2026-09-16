@@ -94,6 +94,33 @@ async function pollPnpDevices() {
     currentKeys.add(key);
 
     if (!activeDevices.has(key)) {
+      // Enforce Blocklist policy before admitting device
+      const policies = db.getDb().policies || [];
+      const blocked = policies.find(
+        (p) => p.type === "Blocklist" && p.vid === dev.vid && p.pid === dev.pid
+      );
+      if (blocked) {
+        console.log(`[Policy] Blocked ${dev.name} (${dev.vid}:${dev.pid}) via ${blocked.id}`);
+        const blockAlert = {
+          id: `ALT-${Date.now()}`,
+          timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
+          title: "USB Device Blocked by Policy",
+          severity: "High",
+          device: dev.name,
+          vid: dev.vid,
+          pid: dev.pid,
+          user: "sec_admin",
+          status: "Active",
+          assignedTo: "Unassigned",
+          mitreTechnique: "T1200 Hardware Additions",
+          ruleTrigger: `POLICY-BLOCK:${blocked.id}`,
+        };
+        db.addAlert(blockAlert);
+        io.emit("alert_generated", blockAlert);
+        io.emit("device_blocked", { id: dev.id, vid: dev.vid, pid: dev.pid, policyId: blocked.id });
+        return;
+      }
+
       console.log(`[PnP Engine] Connected: ${dev.name} (${dev.vid}:${dev.pid})`);
 
       const enrichedDev = {
@@ -215,16 +242,54 @@ app.get("/api/devices", (req, res) => {
   res.json(all);
 });
 
+function paginateAndSearch(req, items) {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const search = (req.query.search || "").toLowerCase().trim();
+  const severity = req.query.severity;
+  let filtered = items;
+  if (search) {
+    filtered = filtered.filter((it) =>
+      Object.values(it).some((v) => v != null && String(v).toLowerCase().includes(search))
+    );
+  }
+  if (severity && severity !== "All") {
+    filtered = filtered.filter((it) => it.severity === severity);
+  }
+  const total = filtered.length;
+  const start = (page - 1) * limit;
+  const paged = filtered.slice(start, start + limit);
+  return { paged, total, page, limit };
+}
+
 app.get("/api/audit-logs", (req, res) => {
-  res.json(db.getDb().auditLogs);
+  const { paged, total, page, limit } = paginateAndSearch(req, db.getDb().auditLogs);
+  res.setHeader("X-Total-Count", total);
+  res.setHeader("X-Page", page);
+  res.setHeader("X-Limit", limit);
+  // Support both legacy (array) and paginated object
+  if (req.query.page || req.query.limit || req.query.search || req.query.severity) {
+    return res.json({ data: paged, total, page, limit });
+  }
+  res.json(paged);
 });
 
 app.get("/api/file-events", (req, res) => {
-  res.json(db.getDb().fileEvents);
+  const { paged, total, page, limit } = paginateAndSearch(req, db.getDb().fileEvents);
+  res.setHeader("X-Total-Count", total);
+  if (req.query.page || req.query.limit || req.query.search) {
+    return res.json({ data: paged, total, page, limit });
+  }
+  res.json(paged);
 });
 
 app.get("/api/alerts", (req, res) => {
-  res.json(db.getDb().alerts);
+  const { paged, total, page, limit } = paginateAndSearch(req, db.getDb().alerts);
+  res.setHeader("X-Total-Count", total);
+  if (req.query.page || req.query.limit || req.query.search || req.query.severity) {
+    return res.json({ data: paged, total, page, limit });
+  }
+  res.json(paged);
 });
 
 const alertActionSchema = z.object({

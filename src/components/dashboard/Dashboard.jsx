@@ -24,6 +24,7 @@ export default function Dashboard() {
     malwareAlerts: 0,
   });
   const [endpoint, setEndpoint] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
@@ -46,11 +47,11 @@ export default function Dashboard() {
         }));
       }
       if (ep) setEndpoint(ep);
+      setLoading(false);
     }
     loadData();
     const interval = setInterval(loadData, 5000);
 
-    // Live Windows system telemetry via WebSocket (no polling lag)
     const socket = io(import.meta.env.VITE_WS_URL || "http://localhost:3001");
     socket.on("endpoint_update", (data) => setEndpoint(data));
     socket.on("connect", loadData);
@@ -125,11 +126,22 @@ export default function Dashboard() {
             letterSpacing: "0.5px",
           }}
         >
-          Enterprise Endpoint Telemetry Metrics (15 Core Indicators)
+          Enterprise Endpoint Telemetry Metrics (15 Core Indicators) {loading && "• Loading..."}
         </h3>
-        <div
-          style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--space-2)" }}
-        >
+        {loading ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--space-2)" }}>
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="card" style={{ padding: 16 }}>
+                <div style={{ height: 12, width: "60%", background: "var(--color-gray-100)", borderRadius: 6, animation: "shimmer 1.4s infinite", backgroundSize: "400% 100%" }} />
+                <div style={{ height: 22, width: "40%", background: "var(--color-gray-200)", borderRadius: 6, marginTop: 12 }} />
+                <div style={{ height: 10, width: "80%", background: "var(--color-gray-100)", borderRadius: 6, marginTop: 8 }} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--space-2)" }}
+          >
           <div
             className="card"
             style={{
@@ -555,6 +567,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Endpoint Details Telemetry Box */}

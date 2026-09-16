@@ -2,13 +2,18 @@ import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 import { toast } from "sonner";
 import { fetchDevices, getActiveMode } from "../api";
+import { useSearch } from "../context/SearchContext";
+import DeviceDrawer from "../components/common/DeviceDrawer";
+import { createPolicy } from "../api";
 
 export default function LiveMonitoring({ onDeviceClick }) {
+  const { query } = useSearch();
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
-  const [mode, setMode] = useState("CHECKING"); // 'LIVE' or 'DEMO'
+  const [mode, setMode] = useState("CHECKING");
   const [highlightedId, setHighlightedId] = useState(null);
   const [eventCount, setEventCount] = useState(0);
+  const [drawerDevice, setDrawerDevice] = useState(null);
 
   const loadData = async () => {
     const data = await fetchDevices();
@@ -61,6 +66,9 @@ export default function LiveMonitoring({ onDeviceClick }) {
     socket.on("alert_generated", (alert) => {
       const fn = alert.severity === "Critical" ? toast.error : toast.warning;
       fn(alert.title, { description: `${alert.device} • ${alert.mitreTechnique}` });
+    });
+    socket.on("device_blocked", (info) => {
+      toast.error(`Blocked by policy ${info.policyId}: ${info.vid}:${info.pid}`);
     });
 
     return () => {
@@ -387,27 +395,33 @@ export default function LiveMonitoring({ onDeviceClick }) {
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-          {devices.map((dev) => {
-            const isHighlighted = dev.id === highlightedId;
-            const mountPoint = dev.mountPoint || dev.connection?.mountPoint || "N/A";
-            const fileSystem = dev.fileSystem || dev.connection?.filesystem || "N/A";
-            const capacity = dev.capacity || dev.connection?.capacity || "N/A";
-            const trustScore = dev.trustScore || 90;
+          {devices
+            .filter((d) =>
+              query
+                ? `${d.name} ${d.vid} ${d.pid} ${d.serial} ${d.manufacturer}`.toLowerCase().includes(query.toLowerCase())
+                : true
+            )
+            .map((dev) => {
+              const isHighlighted = dev.id === highlightedId;
+              const mountPoint = dev.mountPoint || dev.connection?.mountPoint || "N/A";
+              const fileSystem = dev.fileSystem || dev.connection?.filesystem || "N/A";
+              const capacity = dev.capacity || dev.connection?.capacity || "N/A";
+              const trustScore = dev.trustScore || 90;
 
-            return (
-              <div
-                key={dev.id}
-                style={{
-                  display: "flex",
-                  padding: "16px",
-                  borderBottom: "1px solid var(--color-border-light)",
-                  fontSize: "13px",
-                  alignItems: "center",
-                  backgroundColor: isHighlighted ? "var(--color-blue-50)" : "transparent",
-                  transition: "background-color 0.5s ease",
-                  cursor: "pointer",
-                }}
-                onClick={() => setSelectedDevice(dev)}
+              return (
+                <div
+                  key={dev.id}
+                  style={{
+                    display: "flex",
+                    padding: "16px",
+                    borderBottom: "1px solid var(--color-border-light)",
+                    fontSize: "13px",
+                    alignItems: "center",
+                    backgroundColor: isHighlighted ? "var(--color-blue-50)" : "transparent",
+                    transition: "background-color 0.5s ease",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setDrawerDevice(dev)}
               >
                 <div style={{ width: "220px", display: "flex", alignItems: "center", gap: "12px" }}>
                   <div
@@ -577,7 +591,7 @@ export default function LiveMonitoring({ onDeviceClick }) {
                   <button
                     className="btn-icon"
                     title="👁 View Details"
-                    onClick={() => setSelectedDevice(dev)}
+                    onClick={() => setDrawerDevice(dev)}
                   >
                     <span className="material-symbols-rounded" style={{ fontSize: "18px" }}>
                       visibility
@@ -587,6 +601,14 @@ export default function LiveMonitoring({ onDeviceClick }) {
                     className="btn-icon"
                     style={{ color: "var(--color-green-600)" }}
                     title="✅ Allow Device"
+                    onClick={async () => {
+                      try {
+                        await createPolicy({ vid: dev.vid, pid: dev.pid, vendor: dev.manufacturer || dev.vendor, type: "Allowlist" });
+                        toast.success(`Allowlisted ${dev.vid}:${dev.pid}`);
+                      } catch (e) {
+                        toast.error(e.message);
+                      }
+                    }}
                   >
                     <span className="material-symbols-rounded" style={{ fontSize: "18px" }}>
                       check_circle
@@ -596,6 +618,14 @@ export default function LiveMonitoring({ onDeviceClick }) {
                     className="btn-icon"
                     style={{ color: "var(--color-red-600)" }}
                     title="🚫 Block Device"
+                    onClick={async () => {
+                      try {
+                        await createPolicy({ vid: dev.vid, pid: dev.pid, vendor: dev.manufacturer || dev.vendor, type: "Blocklist" });
+                        toast.success(`Blocklisted ${dev.vid}:${dev.pid}`);
+                      } catch (e) {
+                        toast.error(e.message);
+                      }
+                    }}
                   >
                     <span className="material-symbols-rounded" style={{ fontSize: "18px" }}>
                       block
@@ -605,8 +635,36 @@ export default function LiveMonitoring({ onDeviceClick }) {
               </div>
             );
           })}
+          {devices.filter((d) => (query ? `${d.name} ${d.vid} ${d.pid}`.toLowerCase().includes(query.toLowerCase()) : true)).length === 0 && (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-tertiary)" }}>
+              <span className="material-symbols-rounded" style={{ fontSize: 32 }}>search_off</span>
+              <div style={{ marginTop: 8, fontSize: 13 }}>No devices match "{query}"</div>
+            </div>
+          )}
         </div>
       </div>
+      <DeviceDrawer
+        device={drawerDevice}
+        onClose={() => setDrawerDevice(null)}
+        onAllow={async (d) => {
+          try {
+            await createPolicy({ vid: d.vid, pid: d.pid, vendor: d.manufacturer || d.vendor, type: "Allowlist" });
+            toast.success(`Allowlisted ${d.vid}:${d.pid}`);
+            setDrawerDevice(null);
+          } catch (e) {
+            toast.error(e.message);
+          }
+        }}
+        onBlock={async (d) => {
+          try {
+            await createPolicy({ vid: d.vid, pid: d.pid, vendor: d.manufacturer || d.vendor, type: "Blocklist" });
+            toast.success(`Blocklisted ${d.vid}:${d.pid}`);
+            setDrawerDevice(null);
+          } catch (e) {
+            toast.error(e.message);
+          }
+        }}
+      />
     </div>
   );
 }
