@@ -1,13 +1,37 @@
 {
-  "name": "temp-app",
+  "name": "usb-sentinel",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Enterprise USB Device Control & DLP Platform — real-time PnP monitoring, SHA-256 file auditing, MITRE ATT&CK mapping, and SOC dashboard (Windows, React 19 + Node.js + Socket.IO)",
+  "keywords": [
+    "usb-security",
+    "dlp",
+    "endpoint-security",
+    "mitre-attck",
+    "pnp-monitoring",
+    "socket-io",
+    "react",
+    "windows-security"
+  ],
+  "author": "Aeron <aeronjacobjose1@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aeron-1258/USB-Sentinel.git"
+  },
+  "homepage": "https://github.com/Aeron-1258/USB-Sentinel#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "preview": "vite preview",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "lint:fix": "oxlint --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,css,json}\" \"backend/**/*.{js,json}\" \"*.{js,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css,json}\" \"backend/**/*.{js,json}\" \"*.{js,json,md}\""
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -20,6 +44,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
+    "prettier": "^3.6.2",
     "vite": "^8.2.0"
   }
 }

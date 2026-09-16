@@ -1,6 +1,6 @@
 :root {
   /* Google Material Design 3 / Cloud Console Light Theme */
-  
+
   /* Primary Accent Colors */
   --color-blue-50: #e8f0fe;
   --color-blue-100: #d2e3fc;
@@ -13,12 +13,12 @@
   --color-green-500: #1e8e3e; /* Success / Authorized */
   --color-green-600: #137333;
   --color-green-700: #0d652d;
-  
+
   --color-orange-50: #fef7e0;
   --color-orange-500: #f9ab00; /* Warning / Unknown */
   --color-orange-600: #e37400;
   --color-orange-700: #b06000;
-  
+
   --color-red-50: #fce8e6;
   --color-red-500: #d93025; /* Danger / Blocked */
   --color-red-600: #c5221f;
@@ -44,7 +44,7 @@
   --color-surface: #ffffff; /* Card & Container Background */
   --color-surface-hover: #f1f3f4;
   --color-surface-active: #e8eaed;
-  
+
   /* Text Colors */
   --color-text-primary: #202124;
   --color-text-secondary: #5f6368;
@@ -57,16 +57,16 @@
   --color-border: #dadce0;
 
   /* Typography */
-  --font-family-brand: 'Google Sans', 'Inter', -apple-system, sans-serif;
-  --font-family-body: 'Inter', -apple-system, sans-serif;
-  
-  --font-size-xs: 0.75rem;   /* 12px */
-  --font-size-sm: 0.875rem;  /* 14px */
-  --font-size-base: 1rem;    /* 16px */
-  --font-size-lg: 1.125rem;  /* 18px */
-  --font-size-xl: 1.25rem;   /* 20px */
-  --font-size-2xl: 1.5rem;   /* 24px */
-  --font-size-3xl: 1.75rem;  /* 28px */
+  --font-family-brand: "Google Sans", "Inter", -apple-system, sans-serif;
+  --font-family-body: "Inter", -apple-system, sans-serif;
+
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.75rem; /* 28px */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
@@ -75,13 +75,13 @@
 
   /* Spacing (8px system) */
   --space-0: 0;
-  --space-1: 0.5rem;   /* 8px */
-  --space-2: 1rem;     /* 16px */
-  --space-3: 1.5rem;   /* 24px */
-  --space-4: 2rem;     /* 32px */
-  --space-5: 2.5rem;   /* 40px */
-  --space-6: 3rem;     /* 48px */
-  --space-8: 4rem;     /* 64px */
+  --space-1: 0.5rem; /* 8px */
+  --space-2: 1rem; /* 16px */
+  --space-3: 1.5rem; /* 24px */
+  --space-4: 2rem; /* 32px */
+  --space-5: 2.5rem; /* 40px */
+  --space-6: 3rem; /* 48px */
+  --space-8: 4rem; /* 64px */
 
   /* Borders & Radius */
   --radius-sm: 4px;

@@ -1,13 +1,13 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const DB_FILE = path.join(__dirname, 'audit_store.json');
+const DB_FILE = path.join(__dirname, "audit_store.json");
 
 const initialDb = {
   policies: [],
   auditLogs: [],
   fileEvents: [],
-  alerts: []
+  alerts: [],
 };
 
 function loadDb() {
@@ -16,10 +16,10 @@ function loadDb() {
       fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2));
       return initialDb;
     }
-    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const data = fs.readFileSync(DB_FILE, "utf8");
     return JSON.parse(data);
   } catch (err) {
-    console.error('[DB] Error loading database:', err);
+    console.error("[DB] Error loading database:", err);
     return initialDb;
   }
 }
@@ -28,13 +28,13 @@ function saveDb(data) {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
   } catch (err) {
-    console.error('[DB] Error saving database:', err);
+    console.error("[DB] Error saving database:", err);
   }
 }
 
 module.exports = {
   getDb: loadDb,
-  
+
   addAuditLog: (log) => {
     const db = loadDb();
     db.auditLogs.unshift(log);
@@ -60,5 +60,5 @@ module.exports = {
     const db = loadDb();
     db.policies = policies;
     saveDb(db);
-  }
+  },
 };

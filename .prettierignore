@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-ssr
+backend/node_modules
+backend/audit_store.json
+*.log
+package-lock.json
