@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function Sidebar({ currentView, onNavigate }) {
+export default function Sidebar({ currentView, onNavigate, user, onLogout }) {
   const navItems = [
     { id: "dashboard", icon: "dashboard", label: "Dashboard" },
     { id: "analytics", icon: "insights", label: "Analytics" },
@@ -67,6 +67,30 @@ export default function Sidebar({ currentView, onNavigate }) {
       </nav>
 
       <div className="sidebar-footer">
+        {user && (
+          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{user.username}</div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--color-text-tertiary)",
+                textTransform: "uppercase",
+              }}
+            >
+              {user.role}
+            </div>
+            <button
+              className="btn btn-secondary"
+              onClick={onLogout}
+              style={{ width: "100%", marginTop: 8, height: 32, fontSize: 12 }}
+            >
+              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
+                logout
+              </span>
+              Sign out
+            </button>
+          </div>
+        )}
         <div className="nav-item">
           <span className="material-symbols-rounded">help</span>
           Support

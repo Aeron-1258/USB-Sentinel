@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
+import { toast } from "sonner";
 import { fetchDevices, getActiveMode } from "../api";
 
 export default function LiveMonitoring({ onDeviceClick }) {
@@ -41,12 +42,25 @@ export default function LiveMonitoring({ onDeviceClick }) {
       setDevices((prev) => [device, ...prev.filter((d) => d.id !== device.id)]);
       setHighlightedId(device.id);
       setEventCount((c) => c + 1);
+      toast.success(`USB inserted: ${device.name} (${device.vid}:${device.pid})`);
       setTimeout(() => setHighlightedId(null), 4000);
     });
 
     socket.on("usb_removed", (payload) => {
       setDevices((prev) => prev.filter((d) => !(d.vid === payload.vid && d.pid === payload.pid)));
       setEventCount((c) => c + 1);
+      toast.info(`USB removed: ${payload.vid}:${payload.pid}`);
+    });
+
+    socket.on("file_event", (evt) => {
+      toast(`File ${evt.action}: ${evt.filename}`, {
+        description: `${evt.usbDevice} • ${evt.size}`,
+      });
+    });
+
+    socket.on("alert_generated", (alert) => {
+      const fn = alert.severity === "Critical" ? toast.error : toast.warning;
+      fn(alert.title, { description: `${alert.device} • ${alert.mitreTechnique}` });
     });
 
     return () => {
@@ -105,7 +119,7 @@ export default function LiveMonitoring({ onDeviceClick }) {
         overflow: "hidden",
       }}
     >
-      {/* 1. PAGE HEADER WITH DUAL MODE BADGE */}
+      {/* 1. PAGE HEADER */}
       <div
         className="flex justify-between items-center"
         style={{ marginBottom: "4px", flexShrink: 0 }}
@@ -115,45 +129,28 @@ export default function LiveMonitoring({ onDeviceClick }) {
             <h1 className="heading-1" style={{ margin: 0 }}>
               Live USB Monitoring
             </h1>
-            {mode === "LIVE" ? (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  backgroundColor: "var(--color-green-50)",
-                  color: "var(--color-green-600)",
-                  padding: "4px 12px",
-                  borderRadius: "16px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                }}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                backgroundColor:
+                  mode === "LIVE" ? "var(--color-green-50)" : "var(--color-yellow-50)",
+                color: mode === "LIVE" ? "var(--color-green-600)" : "var(--color-yellow-700)",
+                padding: "4px 12px",
+                borderRadius: "16px",
+                fontSize: "12px",
+                fontWeight: 600,
+              }}
+            >
+              <span
+                className={`material-symbols-rounded ${mode === "LIVE" ? "pulse" : ""}`}
+                style={{ fontSize: "14px" }}
               >
-                <span className="material-symbols-rounded pulse" style={{ fontSize: "14px" }}>
-                  fiber_manual_record
-                </span>
-                LIVE ENTERPRISE MODE
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  backgroundColor: "var(--color-yellow-50)",
-                  color: "var(--color-yellow-700)",
-                  padding: "4px 12px",
-                  borderRadius: "16px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                }}
-              >
-                <span className="material-symbols-rounded" style={{ fontSize: "14px" }}>
-                  play_circle
-                </span>
-                DEMO MODE (PREVIEW)
-              </div>
-            )}
+                {mode === "LIVE" ? "fiber_manual_record" : "sync"}
+              </span>
+              {mode === "LIVE" ? "LIVE ENTERPRISE MODE" : "CONNECTING..."}
+            </div>
           </div>
           <p className="text-subtitle" style={{ margin: "2px 0 0 0" }}>
             Real-time PnP hardware telemetry, forensic connection analysis, and instant security

@@ -28,7 +28,11 @@ In enterprise environments, unauthorized USB storage devices pose critical secur
 - **Cryptographic File Movement Auditing** (`backend/file_auditor.js:7`): Computes authentic **MD5** and **SHA-256** checksums for every file copied or modified on removable media via `fs.watch(recursive:true)`.
 - **SOC Threat Intelligence & MITRE ATT&CK Mapping**: Maps rogue devices to MITRE techniques (`T1200`, `T1091`, `T1052.001`) and CVE references (`CVE-2023-38606`, `CVE-2021-3156`).
 - **Dynamic System Telemetry** (`backend/scripts/get_endpoint.ps1`): Automatically resolves host Computer Name, Logged-in User, Windows Build, CPU, RAM, MAC Address, Local IP, and uptime without hardcoded credentials.
-- **Live WebSocket Feed**: `Socket.IO` pushes `usb_inserted`, `usb_removed`, `file_event`, and `alert_generated` to `src/pages/LiveMonitoring.jsx:40` in real time.
+ - **Live WebSocket Feed**: `Socket.IO` pushes `usb_inserted`, `usb_removed`, `file_event`, and `alert_generated` to `src/pages/LiveMonitoring.jsx:40` in real time.
+ - **JWT Auth + RBAC** (`backend/middleware/auth.js:1`, `backend/server.js:147`): `POST /api/auth/login` with `bcryptjs` hashing, `helmet` + `express-rate-limit` (300/15m global, 10/15m auth), `zod` validation; `admin` vs `analyst` roles (admin manages policies, analyst triages).
+ - **Policy CRUD** (`backend/server.js:316`, `backend/db.js:59`): `GET/POST/PUT/DELETE /api/policies` with `VID:PID` (`0xXXXX`) validation, `Allowlist/Blocklist` persisted in `audit_store.json`, admin-only writes.
+ - **Toast Notifications** (`src/pages/LiveMonitoring.jsx:6`, `src/App.jsx:4`): `sonner` toasts for `usb_inserted`, `usb_removed`, `file_event`, `alert_generated` (Critical → error).
+ - **Secure Headers** (`backend/server.js:20`): `helmet` CSP/HSTS/X-Frame, `cors` restricted via `FRONTEND_URL`/`ALLOWED_ORIGINS` env.
 
 ---
 
@@ -118,6 +122,7 @@ cp backend/.env.example backend/.env
 ```
 
 > Backend CORS (`backend/server.js:13`) reads `FRONTEND_URL` / `ALLOWED_ORIGINS` from `dotenv`. Falls back to permissive `*` only if no env is set (dev convenience).
+> Auth: `JWT_SECRET`/`JWT_EXPIRES_IN`/`ADMIN_USER`/`ANALYST_USER` in `backend/.env.example:8` — defaults `admin/Admin@123` (admin) & `analyst/Analyst@123` (analyst).
 
 ### Install Dependencies
 
@@ -253,10 +258,16 @@ Base URL: `http://localhost:3001`
 | `GET`  | `/api/audit-logs`     | System audit logs (Event ID 20001 driver loads, etc.)                                     |
 | `GET`  | `/api/file-events`    | File transfer events with SHA-256                                                         |
 | `GET`  | `/api/alerts`         | SOC alerts                                                                                |
-| `POST` | `/api/alerts/action`  | `{alertId, action, analystNote}` — triage                                                 |
+| `POST` | `/api/auth/login`     | `{username, password}` → `{token, user}` (`zod` + `bcryptjs` + `rate-limit 10/15m`)      |
+| `GET`  | `/api/auth/me`        | Verify JWT (`Authorization: Bearer <token>`)                                               |
+| `GET`  | `/api/policies`       | List allowlist/blocklist (`?type=Allowlist`) (auth required)                              |
+| `POST` | `/api/policies`       | Create `{vid:0xXXXX, pid:0xXXXX, vendor?, type}` (admin only, `zod` `0xXXXX` regex)       |
+| `PUT`  | `/api/policies/:id`   | Update policy (admin)                                                                      |
+| `DELETE` | `/api/policies/:id` | Delete policy (admin)                                                                      |
+| `POST` | `/api/alerts/action`  | `{alertId, action, analystNote}` — triage (auth + `admin/analyst` + `zod`)                |
 | `GET`  | `/api/threats`        | Threat feed (BadUSB, unsigned driver, exfiltration)                                       |
 | `GET`  | `/api/metrics`        | Aggregated SOC metrics for Dashboard                                                      |
-| `POST` | `/api/scan`           | Trigger live `pollEndpointInfo` + `pollPnpDevices`                                        |
+| `POST` | `/api/scan`           | Trigger live `pollEndpointInfo` + `pollPnpDevices` (auth required)                        |
 | `WS`   | `ws://localhost:3001` | Events: `initial_devices`, `usb_inserted`, `usb_removed`, `file_event`, `alert_generated` |
 
 ---
@@ -276,11 +287,15 @@ USB-Sentinel/
 ├── start_frontend_hidden.cmd     # Click-to-launch frontend hidden
 ├── docs/screenshots/             # SOC / LiveMonitoring / DLP screenshots (add PNGs here)
 ├── src/
-│   ├── api.js                    # Live backend API client (REST + WebSocket)
-│   ├── pages/LiveMonitoring.jsx  # Real-time PnP feed + Socket.IO
+│   ├── api.js                    # Live backend API client (REST + WebSocket + authHeaders/policies)
+│   ├── context/AuthContext.jsx   # JWT auth provider (login/logout/me, localStorage)
+│   ├── pages/Login.jsx           # Sign-in (admin/Admin@123, analyst/Analyst@123)
+│   ├── pages/LiveMonitoring.jsx  # Real-time PnP feed + Socket.IO + sonner toasts
 │   └── components/dashboard/     # SOC 15-card telemetry
 ├── backend/
-│   ├── server.js                 # Express + Socket.IO polling engine (2s/10s) + /api/health
+│   ├── server.js                 # Express + Socket.IO polling engine (2s/10s) + /api/health/auth/policies + helmet/rate-limit/zod
+│   ├── middleware/auth.js        # JWT sign/verify + authMiddleware + requireRole
+│   ├── db.js                     # audit_store.json + addPolicy/removePolicy/updatePolicy
 │   ├── file_auditor.js           # fs.watch + MD5/SHA256 hashing
 │   ├── db.js                     # audit_store.json (500 logs / 200 alerts cap)
 │   ├── audit_store.json
@@ -298,14 +313,15 @@ USB-Sentinel/
 
 ## 🆕 What's New (Latest Update)
 
-> **Commit `5e8abd2` — Backend monitoring, service wrapper and frontend integration**
+> **P1 — Auth, Policies, Hardening & UX**
 
-- **Fixed `install_service.ps1`**: Enterprise installer — Scheduled Task (SYSTEM, AtLogOn+AtStartup, auto-restart) + native Windows Service with `sc.exe` recovery; non-admin fallback via Startup LNK + HKCU Run; hidden `service_wrapper.ps1` with stale `:3001` guard and crash-restart loop (`backend/install_service.ps1:30`).
-- **Enhanced PnP Detection** (`backend/scripts/get_pnp_devices.ps1:41`): Now queries `USB, USBSTOR, DiskDrive, HIDClass, Bluetooth`, fixes `$PID` reserved-variable collision (`$pidVal`), tags `isStorage/isHub/category` correctly, and recovers orphan `Win32_DiskDrive` volumes missing from PnP.
-- **Improved Metrics** (`backend/server.js:199`): Separates `totalDevices` (all PnP) vs `totalStorageDevices` (DLP-relevant removable drives) vs `totalPeripherals/totalHubs`; frontend cards now show `Removable Storage: N / Total PnP: M (periph + hubs)` to avoid confusion.
-- **File Auditor Fix** (`backend/file_auditor.js:83`): Renamed `pid` → `devicePid` to avoid collision with process PID in audit logs.
-- **Frontend Hardening** (`src/api.js:104`, `src/pages/LiveMonitoring.jsx:22`): Live backend connectivity checks, Socket.IO `connect`/`connect_error` handling, `isStorageDevice()` helper for consistent Storage vs Peripheral counting.
-- **Background Launchers**: Added `start_frontend.ps1` + `start_frontend_hidden.cmd` and `backend/service_wrapper.ps1` + `backend/start_hidden.cmd` for hidden auto-restart operation.
+- **JWT Auth + RBAC** (`backend/middleware/auth.js:1`, `backend/server.js:147`): `POST /api/auth/login` with `bcryptjs` (`Admin@123`/`Analyst@123`), `JWT_SECRET` env, `helmet` CSP/HSTS, global `300/15m` + auth `10/15m` rate limits, `zod` schemas; `GET /api/auth/me`, role guard `requireRole('admin','analyst')` on `/api/alerts/action` and `/api/policies`.
+- **Policy CRUD** (`backend/server.js:316`, `backend/db.js:59`): `GET/POST/PUT/DELETE /api/policies` with `0xXXXX` `VID:PID` regex, `Allowlist/Blocklist` persisted, `admin`-only writes (analyst `403`), frontend `src/pages/PolicyManagement.jsx:1` now live (form + Vidal/PID validation, `sonner` toasts, `fetchPolicies/createPolicy/deletePolicy` in `src/api.js:230`).
+- **Frontend Auth** (`src/context/AuthContext.jsx:1`, `src/pages/Login.jsx:1`, `src/App.jsx:1`): `AuthProvider` with `localStorage usb_token`, `/auth/me` on load, protected `AppInner` routing, `Sidebar` shows `user/role` + Sign out, `Toaster` `sonner`.
+- **Toasts + CSV** (`src/pages/LiveMonitoring.jsx:6`, `src/pages/SecurityReports.jsx:1`): `usb_inserted/removed`, `file_event`, `alert_generated` → `toast.success/info/error`; SecurityReports now generates proper CSV via `Blob` (was broken JSON→csv) with `try/catch` on `POST /api/scan` (now auth-required).
+- **Security Hardening**: `helmet` headers verified (`Content-Security-Policy`, `X-Frame-Options: SAMEORIGIN`), `cors` env-restricted, `express.json({limit:'100kb'})`, `zod` on `login`/`alertAction`/`policySchema`.
+
+> **Previous `5e8abd2` — Backend monitoring, service wrapper and frontend integration** — (see git log)
 
 ---
 

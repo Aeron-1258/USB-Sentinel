@@ -1,69 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PolicyCard from "../components/policy/PolicyCard";
-
-const initialAllowlist = [
-  {
-    id: "AL-1",
-    type: "Security",
-    vendor: "Yubico",
-    serial: "YB-8921-009",
-    addedBy: "admin@company.com",
-    addedTime: "Oct 12, 2025",
-    notes: "Standard issue security key for Engineering department.",
-    risk: "Low",
-  },
-  {
-    id: "AL-2",
-    type: "HID",
-    vendor: "Logitech",
-    serial: "LOG-KBD-991",
-    addedBy: "admin@company.com",
-    addedTime: "Sep 05, 2025",
-    notes: "Approved wireless receiver for standard keyboards.",
-    risk: "Low",
-  },
-  {
-    id: "AL-3",
-    type: "Storage",
-    vendor: "Kingston",
-    serial: "KN-DT50-128",
-    addedBy: "secops@company.com",
-    addedTime: "Aug 22, 2025",
-    notes: "Encrypted drive for authorized offline backups. Restricted to SOC team.",
-    risk: "Medium",
-  },
-];
-
-const initialBlocklist = [
-  {
-    id: "BL-1",
-    type: "Storage",
-    vendor: "SanDisk",
-    serial: "SD-CRZ-001",
-    addedBy: "SYSTEM",
-    addedTime: "Today, 14:22",
-    notes: "Blocked via automated Mass Storage Policy V3. Unauthorized data exfiltration risk.",
-    risk: "High",
-  },
-  {
-    id: "BL-2",
-    type: "Unknown",
-    vendor: "Generic",
-    serial: "UNK-8829-FF",
-    addedBy: "SYSTEM",
-    addedTime: "Yesterday, 09:11",
-    notes: "BadUSB signature detected. Quarantined indefinitely.",
-    risk: "High",
-  },
-];
+import { fetchPolicies, createPolicy, deletePolicy } from "../api";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 
 export default function PolicyManagement() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [activeTab, setActiveTab] = useState("allowlist");
-  const [allowlist, setAllowlist] = useState(initialAllowlist);
-  const [blocklist, setBlocklist] = useState(initialBlocklist);
+  const [policies, setPolicies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [formVid, setFormVid] = useState("");
+  const [formPid, setFormPid] = useState("");
+  const [formVendor, setFormVendor] = useState("");
+  const [formType, setFormType] = useState("Allowlist");
 
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPolicies();
+      setPolicies(data);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const allowlist = policies.filter((p) => p.type === "Allowlist");
+  const blocklist = policies.filter((p) => p.type === "Blocklist");
   const currentList = activeTab === "allowlist" ? allowlist : blocklist;
 
   const filteredList = currentList.filter(
@@ -90,42 +61,46 @@ export default function PolicyManagement() {
     }
   };
 
-  const handleApprove = (id) => {
-    // If in blocklist, move to allowlist
-    if (activeTab === "blocklist") {
-      const device = blocklist.find((d) => d.id === id);
-      setBlocklist((prev) => prev.filter((d) => d.id !== id));
-      setAllowlist((prev) => [
-        {
-          ...device,
-          risk: "Low",
-          notes: "Manually approved by admin.",
-          addedBy: "admin@company.com",
-        },
-        ...prev,
-      ]);
-    } else {
-      // Already in allowlist, maybe just a toast notification in a real app
-      alert("Device is already in the allowlist.");
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) return toast.error("Only admin can create policies");
+    try {
+      await createPolicy({ vid: formVid, pid: formPid, vendor: formVendor, type: formType });
+      toast.success(`Policy ${formVid}:${formPid} → ${formType}`);
+      setFormVid("");
+      setFormPid("");
+      setFormVendor("");
+      load();
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
-  const handleDelete = (id) => {
-    if (activeTab === "allowlist") {
-      setAllowlist((prev) => prev.filter((d) => d.id !== id));
-    } else {
-      setBlocklist((prev) => prev.filter((d) => d.id !== id));
+  const handleDelete = async (id) => {
+    if (!isAdmin) return toast.error("Only admin can delete");
+    try {
+      await deletePolicy(id);
+      toast.success("Policy removed");
+      setPolicies((prev) => prev.filter((p) => p.id !== id));
+      setSelectedIds((prev) => prev.filter((sid) => sid !== id));
+    } catch (err) {
+      toast.error(err.message);
     }
-    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
   };
 
-  const handleBulkDelete = () => {
-    if (activeTab === "allowlist") {
-      setAllowlist((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
-    } else {
-      setBlocklist((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+  const handleBulkDelete = async () => {
+    for (const id of selectedIds) {
+      try {
+        await deletePolicy(id);
+      } catch (_) {}
     }
+    toast.success(`Deleted ${selectedIds.length} policies`);
+    load();
     setSelectedIds([]);
+  };
+
+  const handleApprove = async (id) => {
+    toast.info("Approve flow: delete from Blocklist and re-create as Allowlist — use form above");
   };
 
   return (
@@ -190,6 +165,106 @@ export default function PolicyManagement() {
           Blocklist ({blocklist.length})
         </button>
       </div>
+
+      {/* Create Policy — admin only */}
+      <form
+        onSubmit={handleCreate}
+        className="card"
+        style={{
+          padding: "12px 16px",
+          display: "flex",
+          gap: 12,
+          alignItems: "end",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600 }}>VID</label>
+          <input
+            placeholder="0x0781"
+            value={formVid}
+            onChange={(e) => setFormVid(e.target.value)}
+            pattern="0x[0-9A-Fa-f]{4}"
+            required
+            style={{
+              display: "block",
+              marginTop: 4,
+              padding: "8px 10px",
+              border: "1px solid var(--color-border-light)",
+              borderRadius: 8,
+              width: 110,
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600 }}>PID</label>
+          <input
+            placeholder="0x5581"
+            value={formPid}
+            onChange={(e) => setFormPid(e.target.value)}
+            pattern="0x[0-9A-Fa-f]{4}"
+            required
+            style={{
+              display: "block",
+              marginTop: 4,
+              padding: "8px 10px",
+              border: "1px solid var(--color-border-light)",
+              borderRadius: 8,
+              width: 110,
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600 }}>Vendor</label>
+          <input
+            placeholder="SanDisk"
+            value={formVendor}
+            onChange={(e) => setFormVendor(e.target.value)}
+            style={{
+              display: "block",
+              marginTop: 4,
+              padding: "8px 10px",
+              border: "1px solid var(--color-border-light)",
+              borderRadius: 8,
+              width: 140,
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600 }}>Type</label>
+          <select
+            value={formType}
+            onChange={(e) => setFormType(e.target.value)}
+            style={{
+              display: "block",
+              marginTop: 4,
+              padding: "8px 10px",
+              border: "1px solid var(--color-border-light)",
+              borderRadius: 8,
+            }}
+          >
+            <option value="Allowlist">Allowlist</option>
+            <option value="Blocklist">Blocklist</option>
+          </select>
+        </div>
+        <button
+          className="btn btn-primary"
+          type="submit"
+          disabled={!isAdmin}
+          style={{ height: 36 }}
+        >
+          <span className="material-symbols-rounded" style={{ fontSize: 18 }}>
+            add
+          </span>
+          {isAdmin ? "Add Policy" : "Admin only"}
+        </button>
+        {!isAdmin && (
+          <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
+            Analyst role is read-only
+          </span>
+        )}
+        {loading && <span style={{ fontSize: 12 }}>Loading...</span>}
+      </form>
 
       {/* Toolbar */}
       <div
@@ -299,12 +374,20 @@ export default function PolicyManagement() {
           filteredList.map((device) => (
             <PolicyCard
               key={device.id}
-              device={device}
+              device={{
+                ...device,
+                vendor: device.vendor || device.vid,
+                serial: device.serial || `${device.vid}:${device.pid}`,
+                addedBy: device.createdBy || device.addedBy,
+                addedTime: device.createdAt || device.addedTime,
+                notes: device.reason || device.notes,
+                risk: device.type === "Blocklist" ? "High" : "Low",
+              }}
               selected={selectedIds.includes(device.id)}
               onSelect={handleSelect}
               onApprove={handleApprove}
               onDelete={handleDelete}
-              onEdit={(id) => alert(`Edit dialog for ${id} would open here.`)}
+              onEdit={() => toast.info("Edit via delete + re-create")}
             />
           ))
         )}

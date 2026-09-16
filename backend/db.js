@@ -61,4 +61,28 @@ module.exports = {
     db.policies = policies;
     saveDb(db);
   },
+
+  addPolicy: (policy) => {
+    const db = loadDb();
+    db.policies.unshift(policy);
+    saveDb(db);
+    return policy;
+  },
+
+  removePolicy: (id) => {
+    const db = loadDb();
+    const before = db.policies.length;
+    db.policies = db.policies.filter((p) => p.id !== id);
+    saveDb(db);
+    return db.policies.length !== before;
+  },
+
+  updatePolicy: (id, patch) => {
+    const db = loadDb();
+    const idx = db.policies.findIndex((p) => p.id === id);
+    if (idx === -1) return null;
+    db.policies[idx] = { ...db.policies[idx], ...patch, updatedAt: new Date().toISOString() };
+    saveDb(db);
+    return db.policies[idx];
+  },
 };

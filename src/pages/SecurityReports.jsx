@@ -9,39 +9,60 @@ export default function SecurityReports() {
     setIsScanning(true);
     setScanStatus("Performing live Windows endpoint scan...");
 
-    await triggerLiveScan();
+    let scanRes;
+    try {
+      scanRes = await triggerLiveScan();
+    } catch (e) {
+      scanRes = { status: e.message };
+    }
+
+    if (scanRes && scanRes.error) {
+      setScanStatus(`Scan failed: ${scanRes.error} — exporting cached data`);
+    } else {
+      setScanStatus(`Scan completed. Generating ${format.toUpperCase()} report...`);
+    }
 
     const endpoint = await fetchEndpointInfo();
     const devices = await fetchDevices();
     const logs = await fetchAuditLogs();
 
-    setScanStatus(
-      `Scanned ${devices.length} devices. Generating ${format.toUpperCase()} report...`
-    );
-
     setTimeout(() => {
-      const reportData = {
-        scanTime: new Date().toISOString(),
-        endpoint: endpoint,
-        connectedDevices: devices,
-        auditSummary: logs,
-      };
-
-      const dataStr =
-        "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
-      const downloadAnchor = document.createElement("a");
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute(
-        "download",
-        `USB_Security_Report_${Date.now()}.${format === "json" ? "json" : "csv"}`
-      );
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
+      if (format === "csv") {
+        // Proper CSV generation for audit logs
+        const headers = ["timestamp", "endpoint", "user", "action", "device", "severity"];
+        const rows = logs.map((l) =>
+          headers.map((h) => `"${String(l[h] ?? "").replace(/"/g, '""')}"`).join(",")
+        );
+        const csvContent = [headers.join(","), ...rows].join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `USB_Security_Report_${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        const reportData = {
+          scanTime: new Date().toISOString(),
+          endpoint: endpoint,
+          connectedDevices: devices,
+          auditSummary: logs,
+        };
+        const dataStr =
+          "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
+        const downloadAnchor = document.createElement("a");
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `USB_Security_Report_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+      }
 
       setIsScanning(false);
       setScanStatus("");
-    }, 1000);
+    }, 800);
   };
 
   return (
